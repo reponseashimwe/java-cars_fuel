@@ -54,7 +54,8 @@ public class GlobalExceptionHandler {
         if (ife != null) {
             String fieldName = "field";
             if (ife.getPath() != null && !ife.getPath().isEmpty()) {
-                var lastPath = ife.getPath().get(ife.getPath().size() - 1);
+                com.fasterxml.jackson.databind.exc.InvalidFormatException.Reference lastPath = 
+                    ife.getPath().get(ife.getPath().size() - 1);
                 if (lastPath != null && lastPath.getFieldName() != null) {
                     fieldName = lastPath.getFieldName();
                 }

@@ -31,7 +31,7 @@ public class CarController {
 
     // GET a car by id
     @GetMapping("/{id}")
-    public Car getCarById(@PathVariable Long id) {
+    public Car getCarById(@PathVariable("id") Long id) {
         return carService.getCarById(id);
     }
 
@@ -44,13 +44,13 @@ public class CarController {
     
     // PUT an existing car
     @PutMapping("/{id}")
-    public Car updateCar(@PathVariable Long id, @RequestBody Car car) {
+    public Car updateCar(@PathVariable("id") Long id, @RequestBody Car car) {
         return carService.updateCar(id, car);
     }
     
     // DELETE a car
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deleteCar(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> deleteCar(@PathVariable("id") Long id) {
         carService.deleteCar(id);
         Map<String, String> response = new HashMap<>();
         response.put("message", "Car with ID " + id + " has been successfully deleted");
@@ -59,7 +59,7 @@ public class CarController {
 
     // Fill a car with fuel
     @PostMapping("/{id}/fuel")
-    public ResponseEntity<FuelEntry> fillCarWithFuel(@PathVariable Long id, @RequestBody FuelEntry fuelEntry) {
+    public ResponseEntity<FuelEntry> fillCarWithFuel(@PathVariable("id") Long id, @RequestBody FuelEntry fuelEntry) {
         fuelEntry.setCarId(id);
         FuelEntry createdFuelEntry = fuelEntryService.createFuelEntry(fuelEntry);
         return new ResponseEntity<>(createdFuelEntry, HttpStatus.CREATED);
@@ -67,13 +67,13 @@ public class CarController {
 
     // GET all fuel entries for a car
     @GetMapping("/{id}/fuel")
-    public List<FuelEntry> getAllFuelEntries(@PathVariable Long id) {
+    public List<FuelEntry> getAllFuelEntries(@PathVariable("id") Long id) {
         return fuelEntryService.getAllFuelEntriesByCarId(id);
     }
 
     // GET fuel stats for a car
     @GetMapping("/{id}/fuel/stats")
-    public Map<String, Double> getFuelStats(@PathVariable Long id) {
+    public Map<String, Double> getFuelStats(@PathVariable("id") Long id) {
         return fuelEntryService.getFuelStats(id);
     }
 }

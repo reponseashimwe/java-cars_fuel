@@ -70,6 +70,69 @@ public class CliUtils {
     }
 
     /**
+     * Gets a parameter value as Double, or returns null if not found or invalid.
+     */
+    public static Double getDoubleParam(Map<String, String> params, String key) {
+        String value = params.get(key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Attempts to parse a parameter as Long, but returns the raw string if parsing fails.
+     * This allows the API to handle validation errors.
+     */
+    public static Object getLongOrStringParam(Map<String, String> params, String key) {
+        String value = params.get(key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return value; // Return raw string, let API validate
+        }
+    }
+
+    /**
+     * Attempts to parse a parameter as Integer, but returns the raw string if parsing fails.
+     * This allows the API to handle validation errors.
+     */
+    public static Object getIntegerOrStringParam(Map<String, String> params, String key) {
+        String value = params.get(key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return value; // Return raw string, let API validate
+        }
+    }
+
+    /**
+     * Attempts to parse a parameter as Double, but returns the raw string if parsing fails.
+     * This allows the API to handle validation errors.
+     */
+    public static Object getDoubleOrStringParam(Map<String, String> params, String key) {
+        String value = params.get(key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return value; // Return raw string, let API validate
+        }
+    }
+
+    /**
      * Performs a GET request to the specified URL.
      */
     public static HttpResponse<String> get(String url) throws IOException, InterruptedException {
@@ -117,26 +180,14 @@ public class CliUtils {
 
     /**
      * Builds a JSON object from a map of key-value pairs.
-     * Escapes string values properly.
+     * Uses ObjectMapper for proper JSON serialization.
      */
     public static String buildJson(Map<String, Object> data) {
-        StringBuilder json = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : data.entrySet()) {
-            if (!first) {
-                json.append(",");
-            }
-            json.append("\"").append(entry.getKey()).append("\":");
-            Object value = entry.getValue();
-            if (value instanceof String) {
-                json.append("\"").append(escapeJson((String) value)).append("\"");
-            } else {
-                json.append(value);
-            }
-            first = false;
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to build JSON: " + e.getMessage(), e);
         }
-        json.append("}");
-        return json.toString();
     }
 
     /**
@@ -152,17 +203,52 @@ public class CliUtils {
 
     /**
      * Prints the response body with pretty-printed JSON if applicable, and handles errors.
+     * For error responses, extracts and displays only the error message.
      */
     public static void printResponse(HttpResponse<String> response) {
+        int statusCode = response.statusCode();
         String body = response.body();
         
-        // Try to pretty print if it's JSON
-        String formattedBody = prettyPrintJson(body);
-        System.out.println(formattedBody);
-        
-        if (response.statusCode() >= 400) {
-            System.err.println("Error: HTTP " + response.statusCode());
+        if (statusCode >= 400) {
+            // For errors, extract and display just the message
+            String errorMessage = extractErrorMessage(body);
+            if (errorMessage != null) {
+                System.err.println("Error: " + errorMessage);
+            } else {
+                // Fallback if we can't parse the error response
+                System.err.println("Error: HTTP " + statusCode);
+                if (body != null && !body.trim().isEmpty()) {
+                    System.err.println(body);
+                }
+            }
+        } else {
+            // For successful responses, pretty print the JSON
+            String formattedBody = prettyPrintJson(body);
+            System.out.println(formattedBody);
         }
+    }
+
+    /**
+     * Extracts the error message from an API error response JSON.
+     * Returns null if the message cannot be extracted.
+     */
+    private static String extractErrorMessage(String jsonBody) {
+        if (jsonBody == null || jsonBody.trim().isEmpty()) {
+            return null;
+        }
+        
+        try {
+            JsonNode jsonNode = objectMapper.readTree(jsonBody);
+            // Try to get the "message" field from ErrorResponse
+            JsonNode messageNode = jsonNode.get("message");
+            if (messageNode != null && messageNode.isTextual()) {
+                return messageNode.asText();
+            }
+        } catch (Exception e) {
+            // If parsing fails, return null to use fallback
+        }
+        
+        return null;
     }
 
     /**

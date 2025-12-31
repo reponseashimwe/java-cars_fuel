@@ -2,6 +2,7 @@ package com.example.cars.cli;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
+import java.util.HashMap;
 import java.util.Map;
 
 public class CarCLI {
@@ -38,18 +39,20 @@ public class CarCLI {
         Map<String, String> params = CliUtils.parseArgs(args);
         String brand = CliUtils.getStringParam(params, "brand");
         String model = CliUtils.getStringParam(params, "model");
-        Integer year = CliUtils.getIntegerParam(params, "year");
+        String yearStr = CliUtils.getStringParam(params, "year");
 
-        if (brand == null || model == null || year == null) {
+        if (brand == null || model == null || yearStr == null) {
             System.err.println("Error: --brand, --model, and --year parameters are required");
             System.exit(1);
         }
 
-        Map<String, Object> carData = Map.of(
-            "brand", brand,
-            "model", model,
-            "year", year
-        );
+        // Try to parse year, but use raw string if parsing fails - API will validate
+        Object year = CliUtils.getIntegerOrStringParam(params, "year");
+
+        Map<String, Object> carData = new HashMap<>();
+        carData.put("brand", brand);
+        carData.put("model", model);
+        carData.put("year", year);
         String json = CliUtils.buildJson(carData);
 
         HttpResponse<String> response = CliUtils.post(BASE_URL, json);
@@ -64,22 +67,24 @@ public class CarCLI {
         Long carId = CliUtils.getLongParam(params, "carId");
         String brand = CliUtils.getStringParam(params, "brand");
         String model = CliUtils.getStringParam(params, "model");
-        Integer year = CliUtils.getIntegerParam(params, "year");
+        String yearStr = CliUtils.getStringParam(params, "year");
 
         if (carId == null) {
             System.err.println("Error: --carId parameter is required");
             System.exit(1);
         }
-        if (brand == null || model == null || year == null) {
+        if (brand == null || model == null || yearStr == null) {
             System.err.println("Error: --brand, --model, and --year parameters are required");
             System.exit(1);
         }
 
-        Map<String, Object> carData = Map.of(
-            "brand", brand,
-            "model", model,
-            "year", year
-        );
+        // Try to parse year, but use raw string if parsing fails - API will validate
+        Object year = CliUtils.getIntegerOrStringParam(params, "year");
+
+        Map<String, Object> carData = new HashMap<>();
+        carData.put("brand", brand);
+        carData.put("model", model);
+        carData.put("year", year);
         String json = CliUtils.buildJson(carData);
 
         HttpResponse<String> response = CliUtils.put(BASE_URL + "/" + carId, json);

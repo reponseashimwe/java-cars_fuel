@@ -27,26 +27,19 @@ public class FuelEntryController {
 
     // GET a fuel entry by id
     @GetMapping("/{id}")
-    public FuelEntry getFuelEntryById(@PathVariable Long id) {
+    public FuelEntry getFuelEntryById(@PathVariable("id") Long id) {
         return fuelEntryService.getFuelEntryById(id);
-    }
-
-    // POST a new fuel entry
-    @PostMapping
-    public ResponseEntity<FuelEntry> createFuelEntry(@RequestBody FuelEntry fuelEntry) {
-        FuelEntry createdFuelEntry = fuelEntryService.createFuelEntry(fuelEntry);
-        return new ResponseEntity<>(createdFuelEntry, HttpStatus.CREATED);
     }
 
     // PUT an existing fuel entry
     @PutMapping("/{id}")
-    public FuelEntry updateFuelEntry(@PathVariable Long id, @RequestBody FuelEntry fuelEntry) {
+    public FuelEntry updateFuelEntry(@PathVariable("id") Long id, @RequestBody FuelEntry fuelEntry) {
         return fuelEntryService.updateFuelEntry(id, fuelEntry);
     }
 
     // DELETE a fuel entry
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deleteFuelEntry(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> deleteFuelEntry(@PathVariable("id") Long id) {
         fuelEntryService.deleteFuelEntry(id);
         Map<String, String> response = new HashMap<>();
         response.put("message", "Fuel entry with ID " + id + " has been successfully deleted");
