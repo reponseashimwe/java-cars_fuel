@@ -1,80 +1,69 @@
 package com.example.cars.service;
 
-import java.util.*;
+import java.util.Calendar;
+import java.util.List;
 
 import com.example.cars.model.Car;
+import com.example.cars.repository.CarRepository;
 import com.example.cars.util.ValidationUtils;
 import org.springframework.stereotype.Service;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class CarService {
-    // In-memory storage for cars
-    private final Map<Long, Car> cars = new HashMap<>();
+    private final CarRepository carRepository;
     private final ValidationUtils validationUtils;
 
-    private final AtomicLong idGenerator = new AtomicLong(1);
-
-    public CarService(ValidationUtils validationUtils) {
+    public CarService(CarRepository carRepository, ValidationUtils validationUtils) {
+        this.carRepository = carRepository;
         this.validationUtils = validationUtils;
     }
 
     // Create a new car
     public Car createCar(Car car) {
-        validateCar(car);
-        long id = idGenerator.getAndIncrement();
-        car.setId(id);
-        cars.put(id, car);
-
-        return car;
+        validateYear(car.getYear());
+        return carRepository.save(car);
     }
 
     // Get all cars
     public List<Car> getAllCars() {
-        return new ArrayList<>(cars.values());
+        return carRepository.findAll();
     }
 
     // Get a car by id
     public Car getCarById(Long id) {
         validateIdExists(id);
-        Car car = cars.get(id);
-        return car;
+        return carRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Car not found with id: " + id));
     }
+
     // Update a car
     public Car updateCar(Long id, Car car) {
         validateIdExists(id);
-        validateCar(car);
+        validateYear(car.getYear());
         Car existingCar = getCarById(id);
         existingCar.setBrand(car.getBrand());
         existingCar.setModel(car.getModel());
         existingCar.setYear(car.getYear());
-        cars.put(id, existingCar);
-
-        return existingCar;
+        return carRepository.save(existingCar);
     }
 
     // Delete a car
     public void deleteCar(Long id) {
         validateIdExists(id);
-
-        cars.remove(id);
+        carRepository.delete(id);
     }
- 
 
-    private void validateCar(Car car) {
-        validationUtils.validateNotNull(car, "Car");
-        validationUtils.validateStringNotEmpty(car.getBrand(), "Brand");
-        validationUtils.validateStringNotEmpty(car.getModel(), "Model");
-        validateYear(car.getYear());
+
+    private void validateIdExists(Long id) {
+        validationUtils.validateEntityExists(id, carRepository::existsById, "Car");
     }
 
     private void validateYear(Integer year) {
-        int currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
-        int minYear = 1886; // First car was made in 1886
-        validationUtils.validateNumber(year, "Year", Integer.valueOf(minYear), Integer.valueOf(currentYear));
-    }
-
-    private void validateIdExists(Long id) {
-        validationUtils.validateEntityExists(id, cars::containsKey, "Car");
+        if (year != null) {
+            int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+            if (year > currentYear) {
+                throw new IllegalArgumentException("Year cannot exceed current year (" + currentYear + ")");
+            }
+        }
     }
 }

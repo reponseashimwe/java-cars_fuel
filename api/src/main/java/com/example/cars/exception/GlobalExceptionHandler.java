@@ -1,20 +1,25 @@
 package com.example.cars.exception;
 
-import com.example.cars.model.ErrorResponse;
+import com.example.cars.dto.Response;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ErrorResponse> handleResponseStatusException(
+    public ResponseEntity<Response<Object>> handleResponseStatusException(
             ResponseStatusException ex,
             HttpServletRequest request) {
         
@@ -23,22 +28,36 @@ public class GlobalExceptionHandler {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
 
-        ErrorResponse errorResponse = new ErrorResponse(
-            status.value(),
-            status.getReasonPhrase(),
-            ex.getReason() != null ? ex.getReason() : status.getReasonPhrase(),
-            request.getRequestURI()
-        );
+        String message = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
+        return new ResponseEntity<>(Response.error(message), status);
+    }
 
-        return new ResponseEntity<>(errorResponse, status);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Response<Object>> handleMethodArgumentNotValidException(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
+        
+        List<String> errorMessages = new ArrayList<>();
+        
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errorMessages.add(fieldName + ": " + errorMessage);
+        });
+        
+        String message = "Validation failed: " + String.join(", ", errorMessages);
+        return new ResponseEntity<>(
+            Response.error(message), 
+            HttpStatus.BAD_REQUEST
+        );
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+    public ResponseEntity<Response<Object>> handleHttpMessageNotReadableException(
             HttpMessageNotReadableException ex,
             HttpServletRequest request) {
         
-        String message = "Invalid request body format";
+        String errorMessage = "Invalid request body format";
         
         // Check for InvalidFormatException in the cause chain
         Throwable cause = ex.getCause();
@@ -52,20 +71,11 @@ public class GlobalExceptionHandler {
         }
         
         if (ife != null) {
-            String fieldName = "field";
-            if (ife.getPath() != null && !ife.getPath().isEmpty()) {
-                com.fasterxml.jackson.databind.exc.InvalidFormatException.Reference lastPath = 
-                    ife.getPath().get(ife.getPath().size() - 1);
-                if (lastPath != null && lastPath.getFieldName() != null) {
-                    fieldName = lastPath.getFieldName();
-                }
-            }
             String value = ife.getValue() != null ? ife.getValue().toString() : "null";
             String type = ife.getTargetType() != null 
                 ? ife.getTargetType().getSimpleName() : "number";
             
-            message = String.format("Invalid value '%s' for field '%s'. Expected %s.", 
-                value, fieldName, type);
+            errorMessage = String.format("Invalid value '%s'. Expected %s.", value, type);
         } else if (ex.getMessage() != null) {
             // Fallback: extract info from message
             String msg = ex.getMessage();
@@ -75,36 +85,26 @@ public class GlobalExceptionHandler {
                 int end = msg.indexOf("\"", start);
                 if (end > start) {
                     String value = msg.substring(start, end);
-                    message = String.format("Invalid value '%s'. Expected a valid number.", value);
+                    errorMessage = String.format("Invalid value '%s'. Expected a valid number.", value);
                 }
             } else if (msg.contains("not a valid")) {
-                message = "Invalid value format. Expected a valid number.";
+                errorMessage = "Invalid value format. Expected a valid number.";
             }
         }
-        
-        ErrorResponse errorResponse = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            HttpStatus.BAD_REQUEST.getReasonPhrase(),
-            message,
-            request.getRequestURI()
-        );
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(
+            Response.error(errorMessage), 
+            HttpStatus.BAD_REQUEST
+        );
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(
+    public ResponseEntity<Response<Object>> handleGenericException(
             Exception ex,
             HttpServletRequest request) {
         
-        ErrorResponse errorResponse = new ErrorResponse(
-            HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-            ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred",
-            request.getRequestURI()
-        );
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+        String message = ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred";
+        return new ResponseEntity<>(Response.error(message), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
 
