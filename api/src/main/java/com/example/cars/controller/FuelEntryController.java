@@ -1,12 +1,11 @@
 package com.example.cars.controller;
 
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+import com.example.cars.dto.*;
 import com.example.cars.model.FuelEntry;
 import com.example.cars.service.FuelEntryService;
 
@@ -21,28 +20,33 @@ public class FuelEntryController {
 
     // GET all fuel entries
     @GetMapping
-    public List<FuelEntry> getAllFuelEntries() {
-        return fuelEntryService.getAllFuelEntries();
+    public ResponseEntity<Response<List<FuelEntry>>> getAllFuelEntries() {
+        List<FuelEntry> fuelEntries = fuelEntryService.getAllFuelEntries();
+        return ResponseEntity.ok(Response.success(fuelEntries));
     }
 
     // GET a fuel entry by id
     @GetMapping("/{id}")
-    public FuelEntry getFuelEntryById(@PathVariable("id") Long id) {
-        return fuelEntryService.getFuelEntryById(id);
+    public ResponseEntity<Response<FuelEntry>> getFuelEntryById(@PathVariable("id") Long id) {
+        FuelEntry fuelEntry = fuelEntryService.getFuelEntryById(id);
+        return ResponseEntity.ok(Response.success(fuelEntry));
     }
 
     // PUT an existing fuel entry
     @PutMapping("/{id}")
-    public FuelEntry updateFuelEntry(@PathVariable("id") Long id, @RequestBody FuelEntry fuelEntry) {
-        return fuelEntryService.updateFuelEntry(id, fuelEntry);
+    public ResponseEntity<Response<FuelEntry>> updateFuelEntry(@PathVariable("id") Long id, @Valid @RequestBody FuelEntryRequest request) {
+        FuelEntry fuelEntry = new FuelEntry();
+        fuelEntry.setLiters(request.getLiters());
+        fuelEntry.setPrice(request.getPrice());
+        fuelEntry.setOdometer(request.getOdometer());
+        FuelEntry updatedFuelEntry = fuelEntryService.updateFuelEntry(id, fuelEntry);
+        return ResponseEntity.ok(Response.success(updatedFuelEntry, "Fuel entry updated successfully"));
     }
 
     // DELETE a fuel entry
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deleteFuelEntry(@PathVariable("id") Long id) {
+    public ResponseEntity<Response<Object>> deleteFuelEntry(@PathVariable("id") Long id) {
         fuelEntryService.deleteFuelEntry(id);
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Fuel entry with ID " + id + " has been successfully deleted");
-        return new ResponseEntity<>(response, HttpStatus.OK);
+        return ResponseEntity.ok(Response.successWithMessage("Fuel entry with ID " + id + " has been successfully deleted"));
     }
 }

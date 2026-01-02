@@ -5,71 +5,64 @@ import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 
 import com.example.cars.model.FuelEntry;
+import com.example.cars.repository.FuelEntryRepository;
 import com.example.cars.util.ValidationUtils;
 import org.springframework.stereotype.Service;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class FuelEntryService {
-    // In-memory storage for fuel entries
-    private final Map<Long, FuelEntry> fuelEntries = new HashMap<>();
+    private final FuelEntryRepository fuelEntryRepository;
     private final CarService carService;
     private final ValidationUtils validationUtils;
 
-    private final AtomicLong idGenerator = new AtomicLong(1);
-
-    public FuelEntryService(CarService carService, ValidationUtils validationUtils) {
+    public FuelEntryService(FuelEntryRepository fuelEntryRepository, CarService carService, ValidationUtils validationUtils) {
+        this.fuelEntryRepository = fuelEntryRepository;
         this.carService = carService;
         this.validationUtils = validationUtils;
     }
 
     // Create a new fuel entry
     public FuelEntry createFuelEntry(FuelEntry fuelEntry) {
-        validateFuelEntry(fuelEntry);
         // Validate that the car exists
         validateCarIdExists(fuelEntry.getCarId());
-        long id = idGenerator.getAndIncrement();
-        fuelEntry.setId(id);
+        // Validate odometer doesn't decrease
+        validateOdometerNotDecreasing(fuelEntry.getCarId(), fuelEntry.getOdometer());
         // Set timestamp if not already set
         if (fuelEntry.getTimestamp() == null) {
             fuelEntry.setTimestamp(LocalDateTime.now());
         }
-        fuelEntries.put(id, fuelEntry);
-
-        return fuelEntry;
+        return fuelEntryRepository.save(fuelEntry);
     }
 
     // Get all fuel entries
     public List<FuelEntry> getAllFuelEntries() {
-        return new ArrayList<>(fuelEntries.values());
+        return fuelEntryRepository.findAll();
     }
 
     // Get a fuel entry by id
     public FuelEntry getFuelEntryById(Long id) {
         validateIdExists(id);
-        FuelEntry fuelEntry = fuelEntries.get(id);
-        return fuelEntry;
+        return fuelEntryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Fuel entry not found with id: " + id));
     }
     
     // Update a fuel entry
     public FuelEntry updateFuelEntry(Long id, FuelEntry fuelEntry) {
         validateIdExists(id);
-        validateFuelEntry(fuelEntry);
         FuelEntry existingFuelEntry = getFuelEntryById(id);
+        // Validate odometer against previous and next entries (by timestamp)
+        validateOdometerForUpdate(existingFuelEntry.getCarId(), existingFuelEntry.getId(), existingFuelEntry.getTimestamp(), fuelEntry.getOdometer());
         existingFuelEntry.setLiters(fuelEntry.getLiters());
         existingFuelEntry.setPrice(fuelEntry.getPrice());
         existingFuelEntry.setOdometer(fuelEntry.getOdometer());
 
-        fuelEntries.put(id, existingFuelEntry);
-
-        return existingFuelEntry;
+        return fuelEntryRepository.save(existingFuelEntry);
     }
 
     // Delete a fuel entry
     public void deleteFuelEntry(Long id) {
         validateIdExists(id);
-
-        fuelEntries.remove(id);
+        fuelEntryRepository.delete(id);
     }
 
     // Fuel Stats
@@ -136,24 +129,67 @@ public class FuelEntryService {
     // Get all fuel entries by car id
     public List<FuelEntry> getAllFuelEntriesByCarId(Long carId) {
         validateCarIdExists(carId);
-        return fuelEntries.values().stream().filter(fuelEntry -> fuelEntry.getCarId().equals(carId)).collect(Collectors.toList());
+        return fuelEntryRepository.findByCarId(carId);
     }
 
-    // Validate fuel entry
-    private void validateFuelEntry(FuelEntry fuelEntry) {
-        validationUtils.validateNotNull(fuelEntry, "Fuel entry");
-        validationUtils.validateNumber(fuelEntry.getLiters(), "Liters", 0.0);
-        validationUtils.validateNumber(fuelEntry.getPrice(), "Price", 0.0);
-        validationUtils.validateNumber(fuelEntry.getOdometer(), "Odometer", 0);
-    }
 
     private void validateIdExists(Long id) {
-        validationUtils.validateEntityExists(id, fuelEntries::containsKey, "Fuel entry");
+        validationUtils.validateEntityExists(id, fuelEntryRepository::existsById, "Fuel entry");
     }
 
     private void validateCarIdExists(Long carId) {
         validationUtils.validateIdNotNull(carId, "Car");
         // Validate car exists by trying to get it
         carService.getCarById(carId);
+    }
+
+    private void validateOdometerNotDecreasing(Long carId, int newOdometer) {
+        List<FuelEntry> existingEntries = getAllFuelEntriesByCarId(carId);
+        if (!existingEntries.isEmpty()) {
+            int maxOdometer = existingEntries.stream()
+                    .mapToInt(FuelEntry::getOdometer)
+                    .max()
+                    .orElse(0);
+            if (newOdometer < maxOdometer) {
+                throw new IllegalArgumentException("Odometer cannot decrease. Maximum odometer for this car: " + maxOdometer + ", New: " + newOdometer);
+            }
+        }
+    }
+
+    private void validateOdometerForUpdate(Long carId, Long entryId, LocalDateTime entryTimestamp, int newOdometer) {
+        List<FuelEntry> allEntries = getAllFuelEntriesByCarId(carId);
+        // Sort by timestamp
+        List<FuelEntry> sortedEntries = allEntries.stream()
+                .sorted(Comparator.comparing(FuelEntry::getTimestamp))
+                .collect(Collectors.toList());
+        
+        // Find the entry being updated
+        int currentIndex = -1;
+        for (int i = 0; i < sortedEntries.size(); i++) {
+            if (sortedEntries.get(i).getId().equals(entryId)) {
+                currentIndex = i;
+                break;
+            }
+        }
+        
+        if (currentIndex == -1) {
+            return; // Entry not found in list, skip validation
+        }
+        
+        // Check previous entry (before this one by timestamp)
+        if (currentIndex > 0) {
+            FuelEntry previousEntry = sortedEntries.get(currentIndex - 1);
+            if (newOdometer < previousEntry.getOdometer()) {
+                throw new IllegalArgumentException("Odometer cannot be below previous entry. Previous odometer: " + previousEntry.getOdometer() + ", New: " + newOdometer);
+            }
+        }
+        
+        // Check next entry (after this one by timestamp)
+        if (currentIndex < sortedEntries.size() - 1) {
+            FuelEntry nextEntry = sortedEntries.get(currentIndex + 1);
+            if (newOdometer > nextEntry.getOdometer()) {
+                throw new IllegalArgumentException("Odometer cannot be above next entry. Next odometer: " + nextEntry.getOdometer() + ", New: " + newOdometer);
+            }
+        }
     }
 }
