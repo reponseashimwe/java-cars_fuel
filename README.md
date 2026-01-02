@@ -1,6 +1,9 @@
 # Cars Management System
 
-A multi-module Maven project for managing cars and fuel entries.
+A multi-module Maven project for managing cars and fuel entries, built as part of a backend technical assignment.
+
+**Tech Stack:** Java 17, Spring Boot, Maven
+**Storage:** In-memory only (no external database)
 
 ## Project Structure
 
@@ -11,7 +14,7 @@ cars/
 │   ├── pom.xml
 │   └── src/
 │       ├── main/
-│       │   ├── java/      # Backend code (controllers, services, models)
+│       │   ├── java/       # Backend code (controllers, services, models)
 │       │   └── resources/  # application.properties
 │       └── test/           # Unit tests
 └── cli/                    # Standalone CLI Client
@@ -27,68 +30,36 @@ cars/
 
 Spring Boot REST API backend providing:
 
--   Car management endpoints (`/api/cars`)
--   Fuel entry endpoints (`/api/fuel-entries`)
--   Car-specific fuel endpoints (`/api/cars/{id}/fuel`)
--   Manual Java Servlet endpoint (`/servlet/fuel-stats?carId={id}`) - demonstrates request lifecycle handling
+* Car management endpoints (`/api/cars`)
+* Fuel entry endpoints (`/api/fuel-entries`)
+* Car-specific fuel endpoints (`/api/cars/{id}/fuel`)
+* Manual Java Servlet endpoint (`/servlet/fuel-stats?carId={id}`) demonstrating the Java Servlet request lifecycle
 
-**To run:**
+#### Servlet Endpoint
 
-```bash
-cd api
-mvn spring-boot:run
-```
+The servlet is implemented manually (without Spring MVC) and demonstrates:
 
-The API will be available at `http://localhost:8080`
+* Query parameter parsing
+* Content-Type configuration
+* HTTP status code handling
+* Manual JSON response writing
 
-**Servlet Endpoint:**
-
-The servlet endpoint demonstrates manual Java Servlet implementation:
+Example request:
 
 ```bash
-# Get fuel statistics via servlet
 curl "http://localhost:8080/servlet/fuel-stats?carId=1"
 ```
 
-The servlet manually handles:
-
--   Query parameter parsing
--   Content-Type setting
--   HTTP status codes
--   JSON response writing
-
 ### cli
 
-Standalone CLI client that communicates with the REST API via HTTP.
+Standalone Java CLI application that communicates with the backend API strictly over HTTP.
 
 **Prerequisites:**
 
--   The API server must be running (see api module above)
--   Java 17+ must be installed
+* Backend API must be running
+* Java 17+
 
-**To build:**
-
-```bash
-# From the project root
-mvn clean package
-
-# Or from the cli directory
-cd cli
-mvn clean package
-```
-
-**To run:**
-
-```bash
-# From the project root
-java -jar cli/target/cli-0.0.1-SNAPSHOT.jar <command> [arguments]
-
-# Or from the cli directory (after building)
-cd cli
-java -jar target/cli-0.0.1-SNAPSHOT.jar <command> [arguments]
-```
-
-**Examples:**
+#### Example Commands
 
 ```bash
 # List all cars
@@ -104,63 +75,67 @@ java -jar cli/target/cli-0.0.1-SNAPSHOT.jar add-fuel --carId 1 --liters 40 --pri
 java -jar cli/target/cli-0.0.1-SNAPSHOT.jar fuel-stats --carId 1
 ```
 
-**Error Handling:**
+#### Available Commands
 
-The CLI validates that all required parameters are provided. Parameter value validation (e.g., ensuring numbers are valid) is handled by the API, which returns clear, user-friendly error messages. For example:
+**Car Commands:**
+
+* `list-cars`
+* `get-car --carId <id>`
+* `create-car --brand <brand> --model <model> --year <year>`
+* `update-car --carId <id> --brand <brand> --model <model> --year <year>`
+* `delete-car --carId <id>`
+
+**Fuel Entry Commands (Car-specific):**
+
+* `add-fuel --carId <id> --liters <liters> --price <price> --odometer <odometer>`
+* `fuel-stats --carId <id>`
+* `car-fuels --carId <id>`
+
+**Fuel Entry Commands (General):**
+
+* `list-fuel-entries`
+* `get-fuel-entry --id <id>`
+* `update-fuel-entry --id <id> --carId <id> --liters <liters> --price <price> --odometer <odometer>`
+* `delete-fuel-entry --id <id>`
+
+## Error Handling & Validation
+
+* The CLI validates that all required parameters are provided
+* Parameter value validation is handled by the API
+* The API returns clear, user-friendly error messages
+* The CLI displays errors extracted from API responses
+
+Example:
 
 ```bash
-# If you provide an invalid value, the API will return a clear error message
 java -jar cli/target/cli-0.0.1-SNAPSHOT.jar add-fuel --carId 1 --liters 40 --price 52.5 --odometer "yes"
 # Error: Invalid value 'yes' for field 'odometer'. Expected int.
 ```
 
-**Available Commands:**
-
-**Car Commands:**
-
--   `list-cars`
--   `get-car --carId <id>`
--   `create-car --brand <brand> --model <model> --year <year>`
--   `update-car --carId <id> --brand <brand> --model <model> --year <year>`
--   `delete-car --carId <id>`
-
-**Fuel Entry Commands (Car-specific):**
-
--   `add-fuel --carId <id> --liters <liters> --price <price> --odometer <odometer>`
--   `fuel-stats --carId <id>`
--   `car-fuels --carId <id>`
-
-**Fuel Entry Commands (General):**
-
--   `list-fuel-entries`
--   `get-fuel-entry --id <id>`
--   `update-fuel-entry --id <id> --carId <id> --liters <liters> --price <price> --odometer <odometer>`
--   `delete-fuel-entry --id <id>`
-
 ## Building the Project
 
-**Build all modules:**
+Build all modules:
 
 ```bash
 mvn clean install
 ```
 
-**Build specific module:**
+Build a specific module:
 
 ```bash
 cd api
 mvn clean package
 ```
 
+## Architecture Overview
+
+* **Backend (api):** Spring Boot application with REST controllers, services, and in-memory data storage
+* **CLI (cli):** Standalone Java application making HTTP requests to the backend
+* **Separation of concerns:** Backend and CLI are independent Maven modules communicating strictly over HTTP
+* **Validation strategy:** Required parameter checks in CLI, value validation in API
+* **Storage:** In-memory only; data is reset on application restart
+
 ## Requirements
 
--   Java 17+
--   Maven 3.6+
-
-## Architecture
-
--   **Backend (api)**: Spring Boot application with REST controllers, services, and in-memory data storage
--   **CLI (cli)**: Standalone Java application that makes HTTP requests to the backend API
--   **Separation**: Backend and CLI are completely independent modules with no shared code dependencies
--   **Validation**: The CLI ensures required parameters are provided, while the API handles value validation and returns clear error messages
--   **Error Handling**: The CLI displays clean error messages extracted from API responses, making it easy to understand what went wrong
+* Java 17+
+* Maven 3.6+
