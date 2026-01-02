@@ -30,6 +30,7 @@ Spring Boot REST API backend providing:
 -   Car management endpoints (`/api/cars`)
 -   Fuel entry endpoints (`/api/fuel-entries`)
 -   Car-specific fuel endpoints (`/api/cars/{id}/fuel`)
+-   Manual Java Servlet endpoint (`/servlet/fuel-stats?carId={id}`) - demonstrates request lifecycle handling
 
 **To run:**
 
@@ -39,6 +40,22 @@ mvn spring-boot:run
 ```
 
 The API will be available at `http://localhost:8080`
+
+**Servlet Endpoint:**
+
+The servlet endpoint demonstrates manual Java Servlet implementation:
+
+```bash
+# Get fuel statistics via servlet
+curl "http://localhost:8080/servlet/fuel-stats?carId=1"
+```
+
+The servlet manually handles:
+
+-   Query parameter parsing
+-   Content-Type setting
+-   HTTP status codes
+-   JSON response writing
 
 ### cli
 
