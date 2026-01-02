@@ -81,12 +81,12 @@ public class FuelEntryService {
     }   
 
     // Calculate fuel stats
-    // Formula: Average (L/100km) = (Total fuel used / Total distance driven) × 100
-    // Distance = last odometer reading - first odometer reading
+    // Formula: Average (L/100km) = (Total fuel consumed / Total distance driven) × 100
+    // Note: Most recent entry (by timestamp) is excluded from consumption calculation as it represents fuel still in tank
     private Map<String, Double> calculateFuelStats(List<FuelEntry> fuelEntries) {
         Map<String, Double> stats = new HashMap<>();
         
-        // Sum all fuel used across all entries
+        // Sum all fuel added across all entries (for totalLiters and totalPrice stats)
         double totalLiters = fuelEntries.stream().mapToDouble(FuelEntry::getLiters).sum();
         double totalPrice = fuelEntries.stream().mapToDouble(FuelEntry::getTotalPrice).sum();
         
@@ -95,28 +95,54 @@ public class FuelEntryService {
         
         // Calculate total distance driven: max odometer - min odometer
         // Sort entries by odometer to find min and max values
-        List<FuelEntry> sortedEntries = fuelEntries.stream()
+        List<FuelEntry> sortedByOdometer = fuelEntries.stream()
             .sorted(Comparator.comparingInt(FuelEntry::getOdometer))
             .collect(Collectors.toList());
         
-        int minOdometer = sortedEntries.get(0).getOdometer();
-        int maxOdometer = sortedEntries.get(sortedEntries.size() - 1).getOdometer();
+        int minOdometer = sortedByOdometer.get(0).getOdometer();
+        int maxOdometer = sortedByOdometer.get(sortedByOdometer.size() - 1).getOdometer();
         
-        // If there's only one entry or entries have same odometer, assume previous was 0
-        // Otherwise, calculate distance from min to max odometer
+        // Calculate total distance
         int totalDistance;
-        if (sortedEntries.size() == 1 || minOdometer == maxOdometer) {
-            // No previous odometer available, assume car started at 0
+        if (sortedByOdometer.size() == 1) {
+            // Only one entry: assume car started at 0, so distance = odometer reading
             totalDistance = maxOdometer;
+        } else if (minOdometer == maxOdometer) {
+            // All entries have same odometer: car hasn't moved, distance is 0
+            totalDistance = 0;
         } else {
+            // Multiple entries with different odometer readings
             totalDistance = maxOdometer - minOdometer;
         }
         
         // Calculate average fuel consumption per 100km
-        // Formula: (Total fuel used / Total distance driven) × 100
         double avgPer100km = 0.0;
-        if (totalDistance > 0) {
-            avgPer100km = (totalLiters / totalDistance) * 100.0;
+        
+        // Handle division by zero: if distance <= 0, consumption cannot be calculated
+        if (totalDistance <= 0) {
+            avgPer100km = 0.0;
+        } else if (fuelEntries.size() == 1) {
+            // Single entry: all fuel was consumed to drive from 0 to odometer reading
+            // Car started at 0km, filled up at X km with Y liters
+            // All Y liters were used to drive X km
+            double fuelConsumed = fuelEntries.get(0).getLiters();
+            avgPer100km = (fuelConsumed / totalDistance) * 100.0;
+            // Round to 2 decimal places
+            avgPer100km = Math.round(avgPer100km * 100.0) / 100.0;
+        } else {
+            // Multiple entries: exclude the most recent entry (by timestamp) as it represents fuel still in tank
+            FuelEntry mostRecentEntry = fuelEntries.stream()
+                .max(Comparator.comparing(FuelEntry::getTimestamp))
+                .orElse(null);
+            
+            // Calculate fuel consumed: sum of all entries except the most recent one
+            double fuelConsumed = fuelEntries.stream()
+                .filter(entry -> !entry.equals(mostRecentEntry))
+                .mapToDouble(FuelEntry::getLiters)
+                .sum();
+            
+            // Formula: (Total fuel consumed / Total distance driven) × 100
+            avgPer100km = (fuelConsumed / totalDistance) * 100.0;
             // Round to 2 decimal places
             avgPer100km = Math.round(avgPer100km * 100.0) / 100.0;
         }

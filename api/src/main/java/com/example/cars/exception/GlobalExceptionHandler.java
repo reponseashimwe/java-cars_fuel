@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
@@ -91,6 +92,29 @@ public class GlobalExceptionHandler {
                 errorMessage = "Invalid value format. Expected a valid number.";
             }
         }
+
+        return new ResponseEntity<>(
+            Response.error(errorMessage), 
+            HttpStatus.BAD_REQUEST
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Response<Object>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request) {
+        
+        String parameterName = ex.getName();
+        String providedValue = ex.getValue() != null ? ex.getValue().toString() : "null";
+        String requiredType = ex.getRequiredType() != null 
+            ? ex.getRequiredType().getSimpleName() : "number";
+        
+        String errorMessage = String.format(
+            "Invalid value '%s' for parameter '%s'. Expected %s.", 
+            providedValue, 
+            parameterName, 
+            requiredType
+        );
 
         return new ResponseEntity<>(
             Response.error(errorMessage), 
